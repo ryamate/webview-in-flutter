@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -18,15 +21,42 @@ class WebViewApp extends StatefulWidget {
 }
 
 class _WebViewAppState extends State<WebViewApp> {
-  late final WebViewController controller;
+  late final WebViewController _controller;
 
   @override
   void initState() {
     super.initState();
-    controller = WebViewController()
-      ..loadRequest(
-        Uri.parse('https://smaregi.jp/'),
-      );
+    _initializeWebView();
+  }
+
+  Future<void> _initializeWebView() async {
+    _controller = WebViewController();
+    await _configureWebView(_controller);
+  }
+
+  Future<void> _configureWebView(WebViewController webViewController) async {
+    await webViewController.setJavaScriptMode(JavaScriptMode.unrestricted);
+    await webViewController.loadRequest(Uri.parse('http://10.0.2.2'));
+
+    await webViewController.addJavaScriptChannel(
+      'sendMessage',
+      onMessageReceived: _onJavaScriptMessageReceived,
+    );
+  }
+
+  Future<void> _onJavaScriptMessageReceived(JavaScriptMessage result) async {
+    if (kDebugMode) {
+      print('js message: ${result.message}');
+    }
+
+    final jsonData = jsonDecode(result.message) as Map<String, dynamic>;
+
+    if (kDebugMode) {
+      print('requested: ${jsonData['type']}');
+    }
+
+    await _controller
+        .runJavaScriptReturningResult("flutterMessage('${jsonData['message']}')");
   }
 
   @override
@@ -36,7 +66,7 @@ class _WebViewAppState extends State<WebViewApp> {
         title: const Text('Flutter WebView'),
       ),
       body: WebViewWidget(
-        controller: controller,
+        controller: _controller,
       ),
     );
   }
